@@ -44,9 +44,6 @@ odm	/odm	f2fs	ro	avb,logical,first_stage_mount
 /dev/block/by-name/hidden      /preload        ext4        defaults                  recoveryonly
 /dev/block/by-name/radio         /modem        emmc     defaults                  recoveryonly
 
-/cp_debug	emmc		/dev/block/bootdevice/by-name/cp_debug		flags=backup=1;display="CP Debug"
-/up_param	emmc		/dev/block/bootdevice/by-name/up_param		flags=backup=1;display="Param"
-
 # Add misc for GOTA
 /dev/block/by-name/misc        /misc           emmc        defaults                  recoveryonly
 
