@@ -8,4 +8,7 @@
 LOCAL_PATH := device/samsung/m33x
 PRODUCT_USE_DYNAMIC_PARTITIONS := true
 
+PRODUCT_PACKAGES += shrink bxhsed
+
+
 
