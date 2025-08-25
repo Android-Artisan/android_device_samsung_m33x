@@ -22,7 +22,7 @@ $(call inherit-product, device/samsung/m33x/device.mk)
 PRODUCT_COPY_FILES += $(call find-copy-subdir-files,*,device/samsung/m33x/recovery/root,recovery/root,root)
 
 PRODUCT_DEVICE := m33x
-PRODUCT_NAME := twrp_m33x
+PRODUCT_NAME := omni_m33x
 PRODUCT_BRAND := samsung
 PRODUCT_MODEL := SM-M336B
 PRODUCT_MANUFACTURER := samsung
