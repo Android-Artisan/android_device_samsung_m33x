@@ -1,0 +1,61 @@
+name: Build TWRP Recovery (M33)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
+  MANIFEST_BRANCH: twrp-12.1
+  DEVICE_TREE_URL: https://github.com/Android-Artisan/android_device_samsung_m33x.git
+  DEVICE_TREE_BRANCH: main
+  DEVICE_NAME: m33x
+  DEVICE_PATH: device/samsung/m33x
+  BUILD_TARGET: recovery
+
+jobs:
+  build:
+    name: Build TWRP Recovery Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout manifest sync tool
+        uses: actions/checkout@v3
+        with:
+          repository: minimal-manifest-twrp/platform_manifest_twrp_aosp
+          path: twrp_manifest
+
+      - name: Initialize AOSP/TWRP repo manifest
+        run: |
+          cd twrp_manifest
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH"
+          repo sync -c -j$(nproc)
+
+      - name: Clone device tree for M33
+        run: |
+          git clone --depth 1 --branch "$DEVICE_TREE_BRANCH" "$DEVICE_TREE_URL" "$DEVICE_PATH"
+
+      - name: Setup build environment
+        run: |
+          source build/envsetup.sh
+          lunch omni_"$DEVICE_NAME"-eng
+
+      - name: Build recovery image
+        run: |
+          make -j$(nproc) "$BUILD_TARGET"
+
+      - name: Collect built artifact
+        run: |
+          ARTIFACT=$(realpath out/target/product/"$DEVICE_NAME"/recovery.img)
+          echo "artifact_path=$ARTIFACT" >> $GITHUB_OUTPUT
+
+      - name: Create release and upload artifact
+        uses: ncipollo/release-action@v1
+        with:
+          tag: recovery-${{ github.sha }}
+          name: TWRP-recovery-${{ github.sha }}
+          body: Automated TWRP build for samsung_m33x on commit ${{ github.sha }}
+          files: ${{ steps.build.outputs.artifact_path }}
+          draft: false
+          prerelease: false
