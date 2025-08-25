@@ -87,14 +87,12 @@ jobs:
         run: |
           TWRP_VERSION="12.1"
           mkdir -p twrp_zip/META-INF/com/google/android
-          cat > twrp_zip/META-INF/com/google/android/updater-script <<EOF
-ui_print("┌─────────────────────────────┐");
-ui_print("│ Flashing ArtisanROM TWRP     │");
-ui_print("│ Version: ${TWRP_VERSION}           │");
-ui_print("│ Device: m33x                 │");
-ui_print("└─────────────────────────────┘");
-package_extract_file("recovery.img", "/dev/block/bootdevice/by-name/recovery");
-EOF
+          echo 'ui_print("┌─────────────────────────────┐");' > twrp_zip/META-INF/com/google/android/updater-script
+          echo 'ui_print("│ Flashing ArtisanROM TWRP     │");' >> twrp_zip/META-INF/com/google/android/updater-script
+          echo "ui_print(\"│ Version: ${TWRP_VERSION}           │\");" >> twrp_zip/META-INF/com/google/android/updater-script
+          echo 'ui_print("│ Device: m33x                 │");' >> twrp_zip/META-INF/com/google/android/updater-script
+          echo 'ui_print("└─────────────────────────────┘");' >> twrp_zip/META-INF/com/google/android/updater-script
+          echo 'package_extract_file("recovery.img", "/dev/block/bootdevice/by-name/recovery");' >> twrp_zip/META-INF/com/google/android/updater-script
           cp ~/twrp/out/target/product/${{ env.DEVICE_NAME }}/recovery.img twrp_zip/recovery.img
           cd twrp_zip
           zip -r ../twrp-${{ env.DEVICE_NAME }}-flashable.zip .
