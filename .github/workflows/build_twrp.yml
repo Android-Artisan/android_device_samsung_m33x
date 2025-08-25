@@ -1,4 +1,4 @@
-name: Build TWRP Recovery for M33x
+name: Build TWRP for M33x with Artisan Branding Message
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: TWRP Build and Release
+    name: Build TWRP + vbmeta + Odin + Flash Message
     runs-on: ubuntu-latest
 
     env:
@@ -25,13 +25,21 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Install required packages
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
-            gcc-multilib g++-multilib libc6-dev-i386 x11proto-core-dev \
+            gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
             libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig \
-            repo python-is-python3
+            python-is-python3 android-sdk-libsparse-utils imagemagick
+          pip install pyavb
+
+      - name: Install repo
+        run: |
+          mkdir ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          sudo ln -sf ~/bin/repo /usr/bin/repo
 
       - name: Initialize TWRP repo
         run: |
@@ -44,24 +52,65 @@ jobs:
           cd ~/twrp
           git clone --depth=1 --branch $DEVICE_TREE_BRANCH $DEVICE_TREE_URL $DEVICE_PATH
 
-      - name: Prepare environment and lunch target
+      - name: Build recovery image
         run: |
           cd ~/twrp
           source build/envsetup.sh
           lunch omni_${DEVICE_NAME}-eng
-
-      - name: Build recovery image
-        run: |
-          cd ~/twrp
           mka recoveryimage -j$(nproc)
 
-      - name: Upload to Release
+      - name: Rename and prepare recovery image
+        run: |
+          cd ~/twrp/out/target/product/${{ env.DEVICE_NAME }}
+          mv recovery.img twrp-${{ env.DEVICE_NAME }}.img
+          cp twrp-${{ env.DEVICE_NAME }}.img recovery.img
+
+      - name: Create vbmeta.img
+        run: |
+          cd ~/twrp/out/target/product/${{ env.DEVICE_NAME }}
+          avbtool make_vbmeta_image \
+            --output vbmeta.img \
+            --include_descriptors_from_image twrp-${{ env.DEVICE_NAME }}.img \
+            --setup_as_rootfs_from_kernel \
+            --disable_verification \
+            --disable_hashtree
+
+      - name: Create Odin tar.md5 with recovery + vbmeta
+        run: |
+          cd ~/twrp/out/target/product/${{ env.DEVICE_NAME }}
+          tar -H ustar -c recovery.img vbmeta.img > odin-temp.tar
+          md5sum odin-temp.tar | cut -d' ' -f1 > md5
+          cat md5 >> odin-temp.tar
+          mv odin-temp.tar twrp-${{ env.DEVICE_NAME }}.tar.md5
+
+      - name: Create TWRP flashable ZIP with cool flash message
+        run: |
+          TWRP_VERSION="12.1"
+          mkdir -p twrp_zip/META-INF/com/google/android
+          cat > twrp_zip/META-INF/com/google/android/updater-script <<EOF
+ui_print("┌─────────────────────────────┐");
+ui_print("│ Flashing ArtisanROM TWRP     │");
+ui_print("│ Version: ${TWRP_VERSION}           │");
+ui_print("│ Device: m33x                 │");
+ui_print("└─────────────────────────────┘");
+package_extract_file("recovery.img", "/dev/block/bootdevice/by-name/recovery");
+EOF
+          cp ~/twrp/out/target/product/${{ env.DEVICE_NAME }}/recovery.img twrp_zip/recovery.img
+          cd twrp_zip
+          zip -r ../twrp-${{ env.DEVICE_NAME }}-flashable.zip .
+
+      - name: Upload to GitHub Releases
         uses: ncipollo/release-action@v1
         with:
           tag: twrp-${{ github.run_number }}
-          name: TWRP for ${{ env.DEVICE_NAME }} - Build ${{ github.run_number }}
+          name: TWRP Artisan Build ${{ github.run_number }} for ${{ env.DEVICE_NAME }}
           body: |
-            Automated TWRP build for `${{ env.DEVICE_NAME }}`
-            Triggered by commit `${{ github.sha }}`
+            ✅ Artisan TWRP Build
+            - **twrp-${{ env.DEVICE_NAME }}.img** — Raw image
+            - **twrp-${{ env.DEVICE_NAME }}.tar.md5** — Odin flashable (recovery + vbmeta)
+            - **twrp-${{ env.DEVICE_NAME }}-flashable.zip** — TWRP flashable ZIP
+            - **vbmeta.img** — Included inside `.tar.md5`
           files: |
-            ~/twrp/out/target/product/${{ env.DEVICE_NAME }}/recovery.img
+            ~/twrp/out/target/product/${{ env.DEVICE_NAME }}/twrp-${{ env.DEVICE_NAME }}.img
+            ~/twrp/out/target/product/${{ env.DEVICE_NAME }}/twrp-${{ env.DEVICE_NAME }}.tar.md5
+            twrp-${{ env.DEVICE_NAME }}-flashable.zip
